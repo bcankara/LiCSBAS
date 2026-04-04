@@ -113,23 +113,32 @@ import LiCSBAS_tools_lib as tools_lib
 LICSAR_TIMEOUT = 30
 
 def fetch_listing(url, pattern):
-    """Fetch directory listing; check original, .public and .future, and prefer
-    whichever has more results.  The original LiCSAR_products/ holds only a
-    small subset, .public has the complete dataset, and .future may contain
+    """Fetch directory listing; check original, .public and .future, and merge
+    all unique results to maximize data coverage. The original LiCSAR_products/ holds only a
+    small subset, .public has the migrated dataset, and .future may contain
     additional IFG entries whose actual files live on data.ceda.ac.uk."""
     # Normalise to base URL
     base_url = url.replace('LiCSAR_products.public/', 'LiCSAR_products/').replace('LiCSAR_products.future/', 'LiCSAR_products/')
-    best_url = base_url
-    best_tags = []
+    
+    unique_hrefs = set()
+    all_tags = []
+    
+    def add_tags(tags):
+        for tag in tags:
+            href = tag.get("href")
+            if href and href not in unique_hrefs:
+                unique_hrefs.add(href)
+                all_tags.append(tag)
+
     # 1) original LiCSAR_products
     try:
         response = requests.get(base_url, timeout=LICSAR_TIMEOUT)
         response.encoding = response.apparent_encoding
         soup = BeautifulSoup(response.text, "html.parser")
-        best_tags = soup.find_all(href=re.compile(pattern))
-        best_url = base_url
+        add_tags(soup.find_all(href=re.compile(pattern)))
     except requests.exceptions.RequestException:
         pass
+        
     # 2) .public
     if 'LiCSAR_products/' in base_url:
         public_url = base_url.replace('LiCSAR_products/', 'LiCSAR_products.public/')
@@ -137,12 +146,10 @@ def fetch_listing(url, pattern):
             response = requests.get(public_url, timeout=LICSAR_TIMEOUT)
             response.encoding = response.apparent_encoding
             soup = BeautifulSoup(response.text, "html.parser")
-            public_tags = soup.find_all(href=re.compile(pattern))
-            if len(public_tags) > len(best_tags):
-                best_tags = public_tags
-                best_url = public_url
+            add_tags(soup.find_all(href=re.compile(pattern)))
         except requests.exceptions.RequestException:
             pass
+            
     # 3) .future (catalogue; may list IFGs not in .public)
     if 'LiCSAR_products/' in base_url:
         future_url = base_url.replace('LiCSAR_products/', 'LiCSAR_products.future/')
@@ -150,13 +157,11 @@ def fetch_listing(url, pattern):
             response = requests.get(future_url, timeout=LICSAR_TIMEOUT)
             response.encoding = response.apparent_encoding
             soup = BeautifulSoup(response.text, "html.parser")
-            future_tags = soup.find_all(href=re.compile(pattern))
-            if len(future_tags) > len(best_tags):
-                best_tags = future_tags
-                best_url = future_url
+            add_tags(soup.find_all(href=re.compile(pattern)))
         except requests.exceptions.RequestException:
             pass
-    return best_url, best_tags
+            
+    return base_url, all_tags
 
 
 class Usage(Exception):
