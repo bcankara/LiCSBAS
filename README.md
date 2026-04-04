@@ -19,9 +19,12 @@ In October 2025, LiCSAR migrated all data to a new storage system on JASMIN. Aft
 
 The correct approach is a **multi-tier fallback**: first try the original URL, then `.public` direct files, then `.public` XML metadata for CEDA URLs, and finally the **`.future` HTML catalogue** which lists the actual download locations. This fork implements all four tiers automatically.
 
-## 4-Tier URL Resolution
+## 4-Tier URL Resolution & Aggregated Discovery
 
-This fork implements an automatic, transparent fallback so **no manual URL changes are needed**:
+This fork introduces two major improvements to ensure robust data retrieval without user-side configuration changes:
+
+1. **Aggregated Discovery:** Instead of reading IFG lists from just one directory, `fetch_listing()` now scans `original`, `.public`, and `.future` catalogues and **merges them into a unified master list**. This guarantees that if some IFGs are scattered across different directories, they are all discovered and processed.
+2. **4-Tier URL Fallback:** For each discovered IFG, the script automatically tests endpoints to find the actual `.tif` files:
 
 ```
 Tier 1 — Original URL (LiCSAR_products/)
@@ -63,7 +66,8 @@ All HTTP requests include a **30-second timeout** and are wrapped in `try-except
 | File | Change |
 |------|--------|
 | `LiCSBAS_lib/LiCSBAS_tools_lib.py` | `resolve_url()` (2-tier for pages), `extract_url_licsar()` (4-tier for files including `.future` HTML parsing), `_extract_ceda_url_from_xml()` (XML→CEDA parser), `_extract_url_from_future_html()` (`.future` catalogue parser), 30 s timeout on all requests |
-| `bin/LiCSBAS01_get_geotiff.py` | `fetch_listing()` checks original, `.public` and `.future`, prefers whichever has more results; graceful exit on empty IFG list instead of `IndexError`; 30 s timeout on all requests |
+| `bin/LiCSBAS01_get_geotiff.py` | `fetch_listing()` aggregates unique IFGs from all endpoints to maximize data coverage; adds detailed summary for unavailable IFGs; graceful exit on empty lists; 30 s request timeouts |
+| `bin/LiCSBAS13_sb_inv.py` | **Bug fix:** Resolved `IndexError` (stale loop variable accessing `gap_patch`), ensuring successful completion of the time-series inversion step |
 | `bin/LiCSBAS_get_eqoffsets.py` | Metadata access via `resolve_url()` fallback |
 | `LiCSBAS_lib/LiCSBAS_meta.py` | Version `1.15.2` (2026-04-03), author credit added |
 | `.gitattributes` | Enforce LF line endings across all platforms |
@@ -91,7 +95,8 @@ Tested against frame `094D_04913_101213` (Merzifon, Turkey) and confirmed:
 - `LiCSAR_products.public/` new pair → direct `.tif` files present
 - CEDA archive via XML parsing → **200**, correct file size
 - `LiCSAR_products.future/` HTML catalogue → lists `<a href>` links to `data.ceda.ac.uk` and `.public` with actual `unw.tif`/`cc.tif` → **200**
-- For period 2023-07 to 2024-01: `.public` listing shows 58 IFG dirs but only 8 have `unw.tif`; **`.future` catalogue resolves the remaining 50** via CEDA links
+- Advanced IFG aggregation successfully combines targets spread across different nodes.
+- `LiCSBAS13_sb_inv.py` inversion runs smoothly past previous `gap_patch` dumping crashes.
 
 ---
 
