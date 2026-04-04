@@ -92,22 +92,6 @@ Instead of reading interferogram listings from a single directory, `fetch_listin
 
 **Fix:** Replaced the stale index reference with the correct patch-scoped variable, ensuring `gap_patch` access stays within bounds for all tile geometries.
 
-### 2. `bcankara.sh` — ASC/DSC Mode Reset on Period Boundaries
-
-**Symptom:** When processing multiple time periods, the script incorrectly resets to ASC mode at the start of each period, re-running already completed ASC work.
-
-**Root Cause:** The ASC/DSC state variable was reassigned at the top of the period loop without checking log completion state.
-
-**Fix:** Introduced a 3-step progress log system (`ASC` → `DSC` → `DECOMPAS`) that independently tracks each phase per period. Completed phases are skipped automatically on re-run.
-
-### 3. `bcankara.sh` — Decompas Fails on Resume (Directory Not Found)
-
-**Symptom:** When re-running the script after ASC+DSC completed successfully, Decompas crashes because it cannot find `01_ASC_...` and `02_DSC_...` directories.
-
-**Root Cause:** On a successful previous run, those directories were already moved into the period archive folder (`2020-01-01_2020-07-01/`), but Decompas only searched the working root.
-
-**Fix:** Decompas now performs a two-stage directory lookup: first in the working root, then inside the period archive folder. This allows Decompas to run independently even after ASC/DSC phases have been archived.
-
 ---
 
 ## 📦 Installation
@@ -241,7 +225,7 @@ LiCSBAS processes Sentinel-1 InSAR data through a structured pipeline:
 | `bin/LiCSBAS13_sb_inv.py` | **Bug fix:** resolved `IndexError` from stale loop variable accessing `gap_patch` |
 | `bin/LiCSBAS_get_eqoffsets.py` | Metadata access via `resolve_url()` fallback |
 | `LiCSBAS_lib/LiCSBAS_meta.py` | Version `1.15.2` (2026-04-04), author credit |
-| `bcankara.sh` | 3-phase progress log (ASC/DSC/DECOMPAS); Decompas two-stage directory lookup; safe file/directory operations on resume |
+
 | `.gitattributes` | Enforce LF line endings across platforms |
 
 ---
@@ -253,9 +237,7 @@ LiCSBAS processes Sentinel-1 InSAR data through a structured pipeline:
 - **feat:** Aggregated IFG discovery across `original`, `.public`, and `.future` catalogues
 - **feat:** `.future` HTML catalogue parsing for CEDA archive links
 - **fix:** `IndexError` crash in `LiCSBAS13_sb_inv.py` (stale `gap_patch` index)
-- **fix:** `bcankara.sh` ASC/DSC mode reset on period boundaries
-- **fix:** `bcankara.sh` Decompas directory-not-found on resume
-- **feat:** 3-phase progress log system (ASC → DSC → DECOMPAS) with resume capability
+
 - **feat:** 30 s timeout on all HTTP requests to prevent indefinite hangs
 - **docs:** Complete README rewrite with installation guide and changelog
 
